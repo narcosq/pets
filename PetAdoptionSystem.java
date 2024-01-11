@@ -1,19 +1,27 @@
 import javafx.application.Application;
 import javafx.collections.FXCollections;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Text;
 import javafx.stage.Stage;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 public class PetAdoptionSystem extends Application {
 
     private ObservableList<Pet> availablePets;
     private ObservableList<Pet> myPets;
+
+    private static final String DB_URL = "jdbc:sqlite:PetAdoptionDB.db";
 
     public static void main(String[] args) {
         launch(args);
@@ -25,23 +33,21 @@ public class PetAdoptionSystem extends Application {
 
         availablePets = FXCollections.observableArrayList();
         myPets = FXCollections.observableArrayList();
+        loadDataFromDatabase();
 
-        // Sample data
         availablePets.add(new Pet("Dog", "Buddy", "Male"));
         availablePets.add(new Pet("Cat", "Whiskers", "Female"));
 
-        GridPane grid = new GridPane();
-        grid.setPadding(new Insets(10, 10, 10, 10));
-        grid.setVgap(5);
-        grid.setHgap(5);
+        AnchorPane root = new AnchorPane();
 
-        // Available Pets ListView
+
+        // Available Pets
         ListView<Pet> availablePetsListView = new ListView<>(availablePets);
         availablePetsListView.setPrefWidth(200);
         availablePetsListView.setPrefHeight(200);
         availablePetsListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
 
-        // My Pets ListView
+        // My Pets
         ListView<Pet> myPetsListView = new ListView<>(myPets);
         myPetsListView.setPrefWidth(200);
         myPetsListView.setPrefHeight(200);
@@ -54,27 +60,103 @@ public class PetAdoptionSystem extends Application {
         Button returnButton = new Button("Return");
         returnButton.setOnAction(e -> returnPet(availablePetsListView, myPetsListView));
 
-        // Button for Donation
-        Button donateButton = new Button("Donate");
-        donateButton.setOnAction(e -> showDonateDialog());
+        // AnchorPane
+        root.getChildren().addAll(
+                new Label("Available Pets"),
+                availablePetsListView,
+                new Label("My Pets"),
+                myPetsListView,
+                adoptButton,
+                returnButton
+        );
 
-        // Button for Veterinarian Questions
-        Button vetQuestionsButton = new Button("Questions for the Veterinarian");
-        vetQuestionsButton.setOnAction(e -> showVetQuestionsDialog());
+// Anchor
+        AnchorPane.setTopAnchor(new Label("Available Pets"), 10.0);
+        AnchorPane.setLeftAnchor(new Label("Available Pets"), 10.0);
 
-        // Add controls to grid
-        grid.add(new Label("Available Pets"), 0, 0);
-        grid.add(availablePetsListView, 0, 1);
-        grid.add(new Label("My Pets"), 1, 0);
-        grid.add(myPetsListView, 1, 1);
-        grid.add(adoptButton, 0, 2);
-        grid.add(returnButton, 1, 2);
-        grid.add(donateButton, 0, 3);
-        grid.add(vetQuestionsButton, 1, 3);
+        AnchorPane.setTopAnchor(availablePetsListView, 30.0);
+        AnchorPane.setLeftAnchor(availablePetsListView, 10.0);
 
-        Scene scene = new Scene(grid, 400, 400);
+        AnchorPane.setTopAnchor(new Label("My Pets"), 10.0);
+        AnchorPane.setRightAnchor(new Label("My Pets"), 10.0);
+
+        AnchorPane.setTopAnchor(myPetsListView, 30.0);
+        AnchorPane.setRightAnchor(myPetsListView, 10.0);
+
+        AnchorPane.setBottomAnchor(adoptButton, 10.0);
+        AnchorPane.setLeftAnchor(adoptButton, 10.0);
+
+        AnchorPane.setBottomAnchor(returnButton, 10.0);
+        AnchorPane.setRightAnchor(returnButton, 10.0);
+
+
+        Scene scene = new Scene(root, 400, 400);
+
+        // window resize
+        primaryStage.widthProperty().addListener((observableValue, oldWidth, newWidth) -> {
+            resizeControls(newWidth.doubleValue(), primaryStage.getHeight(),
+                    availablePetsListView, myPetsListView, adoptButton, returnButton);
+        });
+
+        primaryStage.heightProperty().addListener((observableValue, oldHeight, newHeight) -> {
+            resizeControls(primaryStage.getWidth(), newHeight.doubleValue(),
+                    availablePetsListView, myPetsListView, adoptButton, returnButton);
+        });
+
         primaryStage.setScene(scene);
         primaryStage.show();
+    }
+
+    private void resizeControls(double width, double height,
+                                ListView<Pet> availablePetsListView, ListView<Pet> myPetsListView,
+                                Button adoptButton, Button returnButton) {
+        double listViewWidth = (width - 40) / 2;
+        double listViewHeight = height - 80;
+        double buttonWidth = (width - 40) / 2;
+        double buttonHeight = 30;
+
+        availablePetsListView.setPrefWidth(listViewWidth);
+        availablePetsListView.setPrefHeight(listViewHeight);
+
+        myPetsListView.setPrefWidth(listViewWidth);
+        myPetsListView.setPrefHeight(listViewHeight);
+
+        adoptButton.setPrefWidth(buttonWidth);
+        adoptButton.setPrefHeight(buttonHeight);
+
+        returnButton.setPrefWidth(buttonWidth);
+        returnButton.setPrefHeight(buttonHeight);
+
+        AnchorPane.setTopAnchor(availablePetsListView, 30.0);
+        AnchorPane.setLeftAnchor(availablePetsListView, 10.0);
+
+        AnchorPane.setTopAnchor(myPetsListView, 30.0);
+        AnchorPane.setRightAnchor(myPetsListView, 10.0);
+
+        AnchorPane.setBottomAnchor(adoptButton, 10.0);
+        AnchorPane.setLeftAnchor(adoptButton, 10.0);
+
+        AnchorPane.setBottomAnchor(returnButton, 10.0);
+        AnchorPane.setRightAnchor(returnButton, 10.0);
+    }
+
+    private void loadDataFromDatabase() {
+        try (Connection connection = DriverManager.getConnection(DB_URL)) {
+            availablePets.clear();
+
+            String query = "SELECT * FROM Pets";
+            try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
+                ResultSet resultSet = preparedStatement.executeQuery();
+                while (resultSet.next()) {
+                    String type = resultSet.getString("Type");
+                    String name = resultSet.getString("Name");
+                    String gender = resultSet.getString("Gender");
+                    availablePets.add(new Pet(type, name, gender));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     private void adoptPet(ListView<Pet> availablePetsListView, ListView<Pet> myPetsListView) {
@@ -93,41 +175,6 @@ public class PetAdoptionSystem extends Application {
         }
     }
 
-    private void showDonateDialog() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Support the Project");
-        alert.setHeaderText(null);
-        alert.setContentText("Thank you for considering supporting our Pet Adoption System project!\n\n" +
-                "To make a donation, please visit our website or contact us directly.\n\n");
-
-        alert.showAndWait();
-    }
-
-    private void showVetQuestionsDialog() {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Questions for the Veterinarian");
-        alert.setHeaderText(null);
-
-        Text text = new Text("If you have any questions for the veterinarian, "
-                + "please visit our website and use the contact form.");
-
-        Hyperlink link = new Hyperlink("Visit our website");
-        link.setOnAction(e -> {
-            // Open the website in the default browser
-            getHostServices().showDocument("https://vetgalaxy.ru/articles/10-voprosov-kotorye-vy-dolzhny-zadat-veterinarnomu-vrachu");
-        });
-
-        // Create a VBox to hold the text and hyperlink
-        VBox vbox = new VBox(text, link);
-        vbox.setSpacing(10);
-        vbox.setPadding(new Insets(10));
-
-        // Set the content of the alert to the VBox
-        alert.getDialogPane().setContent(vbox);
-
-        alert.showAndWait();
-    }
-
     public static class Pet {
         private String type;
         private String name;
@@ -137,6 +184,18 @@ public class PetAdoptionSystem extends Application {
             this.type = type;
             this.name = name;
             this.gender = gender;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public String getGender() {
+            return gender;
         }
 
         @Override
